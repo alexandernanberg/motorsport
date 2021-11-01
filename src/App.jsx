@@ -1,70 +1,20 @@
-import {
-  Debug,
-  Physics,
-  useBox,
-  useCylinder,
-  usePlane,
-} from '@react-three/cannon'
+import { Debug, Physics } from '@react-three/cannon'
 import {
   Environment,
   Loader,
   OrbitControls,
   PerspectiveCamera,
-  Sky,
+  Sky as SkyShader,
   Stats,
 } from '@react-three/drei'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { useControls } from 'leva'
-import {
-  forwardRef,
-  Suspense,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-} from 'react'
-import { Vector2, Vector3 } from 'three'
+import { forwardRef, Suspense, useRef } from 'react'
+import { Vector3 } from 'three'
+import { InputManager } from './InputManager'
 import { Skyline } from './models/Skyline'
 import { World } from './models/World'
-
-function Plane(props) {
-  const [ref] = usePlane(() => ({
-    rotation: [-Math.PI / 2, 0, 0],
-    position: [1, 1, 1],
-    friction: 20,
-    ...props,
-  }))
-  return (
-    <mesh ref={ref} castShadow receiveShadow>
-      <planeBufferGeometry args={[10, 10]} />
-      <meshStandardMaterial color="white" />
-    </mesh>
-  )
-}
-
-function Cylinder(props) {
-  const [ref] = useCylinder(() => ({
-    mass: 10,
-    position: [0, 6, -3],
-    rotation: [-Math.PI / 2, 0, 0],
-    ...props,
-  }))
-  return (
-    <mesh ref={ref} castShadow receiveShadow>
-      <cylinderBufferGeometry args={[1, 1]} />
-      <meshStandardMaterial color="green" />
-    </mesh>
-  )
-}
-
-function Cube(props) {
-  const [ref] = useBox(() => ({ mass: 100, position: [0, 6, 3], ...props }))
-  return (
-    <mesh ref={ref} castShadow receiveShadow>
-      <boxBufferGeometry args={[1, 1]} />
-      <meshStandardMaterial color="blue" />
-    </mesh>
-  )
-}
+import { useConstant } from './utils'
 
 function ToggablePysicsDebug({ enabled = false, children }) {
   if (enabled) {
@@ -72,6 +22,38 @@ function ToggablePysicsDebug({ enabled = false, children }) {
   }
 
   return children
+}
+
+function Sky() {
+  const sunPosition = [100, 200, 100]
+
+  return (
+    <>
+      <SkyShader
+        sunPosition={sunPosition}
+        distance={10000}
+        mieDirectionalG={0.9}
+      />
+      <hemisphereLight
+        args={[0xffffff, 0xffffff, 1.0]}
+        color={0x7095c1}
+        position={[0, 50, 0]}
+        groundColor={0xcbc1b2}
+      />
+      <directionalLight
+        position={sunPosition}
+        castShadow
+        shadow-mapSize={[1024, 1024]}
+        // shadow-camera-left={-5}
+        // shadow-camera-right={5}
+        // shadow-camera-top={5}
+        // shadow-camera-bottom={-5}
+        // shadow-camera-near={1}
+        // shadow-camera-far={20}
+      />
+      <Environment preset="park" />
+    </>
+  )
 }
 
 export function App() {
@@ -85,32 +67,15 @@ export function App() {
     {}
   )
 
-  const sunPosition = [100, 100, 100]
-
   return (
     <>
-      <Canvas shadows mode="concurrent">
+      <Canvas shadows mode="concurrent" camera={{ position: [5, 4, -4] }}>
         <Suspense fallback={null}>
           <Stats />
-          <fog attach="fog" args={['white', 0, 500]} />
-          <Sky
-            sunPosition={sunPosition}
-            distance={10000}
-            mieDirectionalG={0.9}
-          />
-          <ambientLight intensity={0.1} />
-          <directionalLight
-            position={sunPosition}
-            shadow-bias={-0.001}
-            shadow-mapSize={[4096, 4096]}
-            shadow-camera-left={-150}
-            shadow-camera-right={150}
-            shadow-camera-top={150}
-            shadow-camera-bottom={-150}
-            castShadow
-          />
+          <fog attach="fog" args={[0xffffff, 10, 90]} />
+          <Sky />
           <Environment preset="park" />
-          <InputControls ref={inputRef} cameraRef={cameraRef} />
+          <InputManager ref={inputRef} cameraRef={cameraRef} />
           <Physics
             broadphase="SAP"
             allowSleep
@@ -120,8 +85,6 @@ export function App() {
           >
             <ToggablePysicsDebug enabled={flags.Debug}>
               <World />
-              <Cylinder />
-              <Cube />
               <Player ref={playerRef} inputRef={inputRef} />
             </ToggablePysicsDebug>
           </Physics>
@@ -186,234 +149,9 @@ const ThirdPersonCamera = forwardRef(function ThirdPersonCamera(
   )
 })
 
-/*
-=============================================
-  InputControls
-=============================================
-*/
-
-function applyDeadzone(number, threshold) {
-  let percentage = (Math.abs(number) - threshold) / (1 - threshold)
-
-  if (percentage < 0) {
-    percentage = 0
-  }
-
-  return percentage * (number > 0 ? 1 : -1)
-}
-
-const InputControls = forwardRef(function InputControls(
-  { cameraRef },
-  forwardedRef
-) {
-  const gl = useThree((state) => state.gl)
-
-  const state = useConstant(() => ({
-    movement: new Vector2(0, 0),
-    lookAt: new Vector2(0, 0),
-    keyboard: {},
-    gamepadIndex: null,
-    pointerLocked: false,
-  }))
-
-  const getInput = () => {
-    const input = state
-
-    if (state.gamepadIndex !== null) {
-      const gamepad = navigator.getGamepads()[state.gamepadIndex]
-      input.movement.x = applyDeadzone(gamepad.axes[0], 0.25) * -1
-      input.movement.y = applyDeadzone(gamepad.axes[1], 0.25) * -1
-    }
-
-    return state
-  }
-
-  useImperativeHandle(forwardedRef, () => ({ getInput }))
-
-  useEffect(() => {
-    const updateMovementFromKeyboard = () => {
-      let x = 0
-      let y = 0
-
-      if (state.keyboard.KeyW || state.keyboard.ArrowUp) {
-        y += 1
-      }
-      if (state.keyboard.KeyA || state.keyboard.ArrowLeft) {
-        x += 1
-      }
-      if (state.keyboard.KeyS || state.keyboard.ArrowDown) {
-        y -= 1
-      }
-      if (state.keyboard.KeyD || state.keyboard.ArrowRight) {
-        x -= 1
-      }
-
-      state.movement.set(x, y)
-    }
-
-    const onKeyDown = (event) => {
-      state.keyboard[event.code] = true
-      updateMovementFromKeyboard()
-    }
-
-    const onKeyUp = (event) => {
-      state.keyboard[event.code] = false
-      updateMovementFromKeyboard()
-    }
-
-    document.addEventListener('keydown', onKeyDown, false)
-    document.addEventListener('keyup', onKeyUp, false)
-
-    return () => {
-      document.removeEventListener('keydown', onKeyDown, false)
-      document.removeEventListener('keyup', onKeyUp, false)
-    }
-  }, [state.keyboard, state.movement])
-
-  useEffect(() => {
-    const domElement = gl.domElement
-
-    const onPointerMove = (event) => {
-      const { movementX, movementY } = event
-
-      state.lookAt.x -= movementX
-      state.lookAt.y -= movementY
-    }
-
-    // const onClick = () => {
-    //   domElement.requestPointerLock();
-    // };
-
-    const onPointerLockChange = () => {
-      state.pointerLocked = document.pointerLockElement === domElement
-    }
-
-    // domElement.addEventListener("click", onClick, false);
-    domElement.addEventListener('pointerlockchange', onPointerLockChange)
-    domElement.addEventListener('pointerlockerror', (e) => {
-      console.log('err', e)
-    })
-
-    document.addEventListener('pointermove', onPointerMove, false)
-
-    return () => {
-      document.removeEventListener('pointermove', onPointerMove, false)
-    }
-  }, [cameraRef, gl.domElement, state, state.lookAt])
-
-  useEffect(() => {
-    const onConnect = (event) => {
-      console.log(
-        'Gamepad connected at index %d: %s. %d buttons, %d axes.',
-        event.gamepad.index,
-        event.gamepad.id,
-        event.gamepad.buttons,
-        event.gamepad.axes
-      )
-      if (state.gamepadIndex === null) {
-        state.gamepadIndex = event.gamepad.index
-      }
-    }
-
-    const onDisconnect = (event) => {
-      if (event.gamepad.id === state.gamepadIndex) {
-        state.gamepadIndex = null
-      }
-    }
-
-    window.addEventListener('gamepadconnected', onConnect, true)
-    window.addEventListener('gamepaddisconnected', onDisconnect, true)
-
-    return () => {
-      window.removeEventListener('gamepadconnected', onConnect, true)
-      window.removeEventListener('gamepaddisconnected', onDisconnect, true)
-    }
-  })
-
-  useFrame(() => {
-    // console.log(state.gamepadIndex?.axes);
-    // console.log(state.movement);
-  })
-
-  return null
-})
-
-/**
- * Player
- */
-
 const Player = forwardRef(function Player({ inputRef }, forwardedRef) {
   const ref = useRef()
   const playerRef = forwardedRef || ref
 
-  // const decceleration = useConstant(() => new Vector3(-0.001, 1, -10));
-  // const acceleration = useConstant(() => new Vector3(0.25, 100, 100));
-  // const velocity = useConstant(() => new Vector3(0, 0, 0));
-
-  // useFrame((state, delta) => {
-  //   const input = inputRef.current.getInput();
-  //   const player = playerRef.current;
-
-  //   const frameDecceleration = new Vector3(
-  //     velocity.x * decceleration.x,
-  //     velocity.y * decceleration.y,
-  //     velocity.z * decceleration.z
-  //   );
-  //   frameDecceleration.multiplyScalar(delta);
-  //   frameDecceleration.z =
-  //     Math.sign(frameDecceleration.z) *
-  //     Math.min(Math.abs(frameDecceleration.z), Math.abs(velocity.z));
-
-  //   velocity.add(frameDecceleration);
-
-  //   const axis = new Vector3();
-  //   const quat = new Quaternion();
-  //   const playerQuat = player.quaternion.clone();
-  //   const acc = acceleration.clone();
-
-  //   velocity.z += input.movement.y * acc.z * delta;
-
-  //   axis.set(0, 1, 0);
-  //   quat.setFromAxisAngle(
-  //     axis,
-  //     4.0 * input.movement.x * Math.PI * delta * acc.x
-  //   );
-  //   playerQuat.multiply(quat);
-  //   player.quaternion.copy(playerQuat);
-
-  //   const forward = new Vector3(0, 0, 1);
-  //   forward.applyQuaternion(player.quaternion);
-  //   forward.normalize();
-
-  //   const sideways = new Vector3(1, 0, 0);
-  //   sideways.applyQuaternion(player.quaternion);
-  //   sideways.normalize();
-
-  //   velocity.y += acc.y;
-  //   velocity.y = Math.max(velocity.y, -100);
-
-  //   sideways.multiplyScalar(velocity.x * delta);
-  //   forward.multiplyScalar(velocity.z * delta);
-
-  //   player.position.add(forward);
-  //   player.position.add(sideways);
-  // });
-
   return <Skyline ref={playerRef} inputRef={inputRef} />
 })
-
-/**
- * Create constant only once.
- * @template T
- * @param {() => T} fn
- * @return {T}
- */
-function useConstant(fn) {
-  const ref = useRef()
-
-  if (!ref.current) {
-    ref.current = { v: fn() }
-  }
-
-  return ref.current.v
-}

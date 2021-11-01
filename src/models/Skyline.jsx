@@ -12,7 +12,7 @@ Model License:
 import { useBox, useRaycastVehicle } from '@react-three/cannon'
 import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import React, { createRef, forwardRef, useMemo } from 'react'
+import { createRef, forwardRef, useMemo } from 'react'
 import { MathUtils } from 'three'
 import { Wheel } from './Wheel'
 
@@ -28,7 +28,7 @@ const vehicleConfig = {
   back: -1.45,
   steer: 0.6,
   force: 12000,
-  maxBrake: 65,
+  maxBrake: 300,
   maxSpeed: 88,
 }
 
@@ -40,16 +40,15 @@ const wheelInfo = {
   directionLocal: [0, -1, 0],
   frictionSlip: 10,
   radius: 0.32,
-  rollInfluence: 0,
-  sideAcceleration: 10,
+  rollInfluence: 0.05,
+  // sideAcceleration: 10,
   suspensionRestLength: 0.5,
-  suspensionStiffness: 200,
-  // maxSuspensionForce: 10000,
+  suspensionStiffness: 100,
   maxSuspensionTravel: 10,
-  // dampingRelaxation: 100,
-  // dampingCompression: 1,
-  useCustomSlidingRotationalSpeed: true,
-  customSlidingRotationalSpeed: -3,
+  // useCustomSlidingRotationalSpeed: true,
+  // customSlidingRotationalSpeed: -2,
+  dampingRelaxation: 5,
+  dampingCompression: 5,
 }
 
 const { back, front, height, width, steer, force, maxBrake, maxSpeed } =
@@ -134,6 +133,12 @@ const Chassi = forwardRef(function Chassi(props, forwardedRef) {
     }),
     forwardedRef
   )
+
+  // useLayoutEffect(() => {
+  //   api.position.subscribe((pos) => {
+  //     console.log(pos)
+  //   })
+  // })
 
   return (
     <group ref={forwardedRef} dispose={null}>
@@ -223,7 +228,7 @@ const Chassi = forwardRef(function Chassi(props, forwardedRef) {
 
 export { Skyline }
 
-useGLTF.preload('/r32.gltf')
+useGLTF.preload('/r34.gltf')
 
 function setRef(ref, value) {
   if (ref == null) return
