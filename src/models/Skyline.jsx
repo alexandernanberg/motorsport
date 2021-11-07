@@ -12,8 +12,9 @@ Model License:
 import { useBox, useRaycastVehicle } from '@react-three/cannon'
 import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { createRef, forwardRef, useMemo } from 'react'
-import { MathUtils } from 'three'
+import { createRef, forwardRef, useLayoutEffect, useRef } from 'react'
+import { MathUtils, Quaternion, Vector3 } from 'three'
+import { useConstant } from '../utils'
 import { Wheel } from './Wheel'
 
 const { lerp } = MathUtils
@@ -38,7 +39,7 @@ const vehicleConfig = {
 const wheelInfo = {
   axleLocal: [-1, 0, 0],
   directionLocal: [0, -1, 0],
-  frictionSlip: 10,
+  frictionSlip: 5,
   radius: 0.32,
   rollInfluence: 0.05,
   // sideAcceleration: 10,
@@ -68,12 +69,15 @@ const wheelInfos = wheels.map((_, index) => {
 })
 
 const Skyline = forwardRef(function Skyline(
-  { inputRef, ...props },
+  { inputRef, cameraRef, ...props },
   forwardedRef
 ) {
+  const ref = useRef()
+  const chassiRef = forwardedRef || ref
+
   const [, api] = useRaycastVehicle(
     () => ({
-      chassisBody,
+      chassisBody: chassiRef,
       wheels,
       wheelInfos,
       indexForwardAxis: 2,
@@ -110,8 +114,8 @@ const Skyline = forwardRef(function Skyline(
   })
 
   return (
-    <group ref={forwardedRef} {...props} dispose={null}>
-      <Chassi ref={chassisBody} />
+    <group {...props} dispose={null}>
+      <Chassi ref={forwardedRef} cameraRef={cameraRef} />
       <Wheel ref={wheels[0]} side="right" radius={wheelInfo.radius} />
       <Wheel ref={wheels[1]} side="left" radius={wheelInfo.radius} />
       <Wheel ref={wheels[2]} side="right" radius={wheelInfo.radius} />
@@ -120,7 +124,10 @@ const Skyline = forwardRef(function Skyline(
   )
 })
 
-const Chassi = forwardRef(function Chassi(props, forwardedRef) {
+const Chassi = forwardRef(function Chassi(
+  { cameraRef, ...props },
+  forwardedRef
+) {
   const { nodes, materials } = useGLTF('/r34.gltf')
 
   const [, api] = useBox(
@@ -129,16 +136,49 @@ const Chassi = forwardRef(function Chassi(props, forwardedRef) {
       args: [1.8, 0.7, 4.6],
       position: [0, 1.5, 0],
       allowSleep: false,
+      sleepSpeedLimit: 0.03,
       ...props,
     }),
     forwardedRef
   )
 
-  // useLayoutEffect(() => {
-  //   api.position.subscribe((pos) => {
-  //     console.log(pos)
-  //   })
-  // })
+  // useImperativeHandle(forwardedRef, () => ({ getInput }))
+
+  const position = useConstant(() => new Vector3())
+  const quaternion = useConstant(() => new Quaternion())
+
+  useLayoutEffect(() => {
+    api.position.subscribe((pos) => {
+      position.set(...pos)
+    })
+    api.quaternion.subscribe((rot) => {
+      quaternion.set(...rot)
+    })
+  }, [])
+
+  const currentPosition = useConstant(() => new Vector3())
+  const currentLookAt = useConstant(() => new Vector3())
+
+  useFrame((_, delta) => {
+    const camera = cameraRef.current
+
+    const idealOffset = new Vector3(0, 2, -4.8)
+    idealOffset.applyQuaternion(quaternion)
+    idealOffset.add(position)
+
+    // console.log(idealOffset, position)
+
+    const idealLookAt = new Vector3(0, 1, 5)
+    idealLookAt.applyQuaternion(quaternion)
+    idealLookAt.add(position)
+
+    const t = 1.3 - Math.pow(0.001, delta)
+    currentPosition.lerp(idealOffset, t)
+    currentLookAt.lerp(idealLookAt, t)
+
+    camera.position.copy(currentPosition)
+    camera.lookAt(currentLookAt)
+  })
 
   return (
     <group ref={forwardedRef} dispose={null}>
@@ -229,31 +269,3 @@ const Chassi = forwardRef(function Chassi(props, forwardedRef) {
 export { Skyline }
 
 useGLTF.preload('/r34.gltf')
-
-function setRef(ref, value) {
-  if (ref == null) return
-  if (typeof ref === 'function') {
-    ref(value)
-  } else {
-    try {
-      ref.current = value // eslint-disable-line no-param-reassign
-    } catch (error) {
-      throw new Error(`Cannot assign value "${value}" to ref "${ref}"`)
-    }
-  }
-}
-
-function useForkRef(...refs) {
-  return useMemo(
-    () => {
-      if (refs.every((ref) => ref == null)) {
-        return null
-      }
-      return (refValue) => {
-        refs.forEach((ref) => setRef(ref, refValue))
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    refs
-  )
-}

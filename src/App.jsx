@@ -2,19 +2,39 @@ import { Debug, Physics } from '@react-three/cannon'
 import {
   Environment,
   Loader,
-  OrbitControls,
   PerspectiveCamera,
   Sky as SkyShader,
   Stats,
 } from '@react-three/drei'
 import { Canvas, useFrame } from '@react-three/fiber'
+import * as Ammo from 'ammo.js'
 import { useControls } from 'leva'
-import { forwardRef, Suspense, useRef } from 'react'
+import { forwardRef, Suspense, useLayoutEffect, useRef } from 'react'
 import { Vector3 } from 'three'
-import { InputManager } from './InputManager'
+import { InputManager } from './components/InputManager'
 import { Skyline } from './models/Skyline'
 import { World } from './models/World'
 import { useConstant } from './utils'
+
+console.log(Ammo)
+
+// function Physics() {
+//   const {} = useConstant(() => {
+//     collisionConfiguration = new Ammo.btDefaultCollisionConfiguration()
+//     dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration)
+//     broadphase = new Ammo.btDbvtBroadphase()
+//     solver = new Ammo.btSequentialImpulseConstraintSolver()
+//     physicsWorld = new Ammo.btDiscreteDynamicsWorld(
+//       dispatcher,
+//       broadphase,
+//       solver,
+//       collisionConfiguration
+//     )
+//     physicsWorld.setGravity(new Ammo.btVector3(0, -9.82, 0))
+//   })
+
+//   return null
+// }
 
 function ToggablePysicsDebug({ enabled = false, children }) {
   if (enabled) {
@@ -85,15 +105,19 @@ export function App() {
           >
             <ToggablePysicsDebug enabled={flags.Debug}>
               <World />
-              <Player ref={playerRef} inputRef={inputRef} />
+              <Player
+                ref={playerRef}
+                inputRef={inputRef}
+                cameraRef={cameraRef}
+              />
             </ToggablePysicsDebug>
           </Physics>
-          <OrbitControls />
-          {/* <ThirdPersonCamera
+          {/* <OrbitControls /> */}
+          <ThirdPersonCamera
             ref={cameraRef}
             targetRef={playerRef}
             inputRef={inputRef}
-          /> */}
+          />
         </Suspense>
       </Canvas>
       <Loader />
@@ -112,26 +136,29 @@ const ThirdPersonCamera = forwardRef(function ThirdPersonCamera(
   const currentPosition = useConstant(() => new Vector3())
   const currentLookAt = useConstant(() => new Vector3())
 
+  useLayoutEffect(() => {
+    // const target = targetRef.current
+    // console.log(target.position)
+  })
+
   useFrame((_, delta) => {
     const camera = cameraRef.current
     const target = targetRef.current
-    // const group = groupRef.current;
-    // const input = inputRef.current.getInput();
 
-    const idealOffset = new Vector3(0, 2, -3.5)
-    idealOffset.applyQuaternion(target.quaternion)
-    idealOffset.add(target.position)
+    // const idealOffset = new Vector3(0, 2, -3.5)
+    // idealOffset.applyQuaternion(target.quaternion)
+    // idealOffset.add(target.position)
 
-    const idealLookAt = new Vector3(0, 1, 5)
-    idealLookAt.applyQuaternion(target.quaternion)
-    idealLookAt.add(target.position)
+    // const idealLookAt = new Vector3(0, 1, 5)
+    // idealLookAt.applyQuaternion(target.quaternion)
+    // idealLookAt.add(target.position)
 
-    const t = 1.05 - Math.pow(0.001, delta)
-    currentPosition.lerp(idealOffset, t)
-    currentLookAt.lerp(idealLookAt, t)
+    // const t = 1.05 - Math.pow(0.001, delta)
+    // currentPosition.lerp(idealOffset, t)
+    // currentLookAt.lerp(idealLookAt, t)
 
-    camera.position.copy(currentPosition)
-    camera.lookAt(currentLookAt)
+    // camera.position.copy(currentPosition)
+    // camera.lookAt(currentLookAt)
   })
 
   return (
@@ -149,9 +176,12 @@ const ThirdPersonCamera = forwardRef(function ThirdPersonCamera(
   )
 })
 
-const Player = forwardRef(function Player({ inputRef }, forwardedRef) {
+const Player = forwardRef(function Player(
+  { inputRef, cameraRef },
+  forwardedRef
+) {
   const ref = useRef()
   const playerRef = forwardedRef || ref
 
-  return <Skyline ref={playerRef} inputRef={inputRef} />
+  return <Skyline ref={playerRef} inputRef={inputRef} cameraRef={cameraRef} />
 })

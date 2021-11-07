@@ -1,7 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { forwardRef, useEffect, useImperativeHandle } from 'react'
 import { Vector2 } from 'three'
-import { useConstant } from './utils'
+import { useConstant } from '../utils'
 
 function applyDeadzone(number, threshold) {
   let percentage = (Math.abs(number) - threshold) / (1 - threshold)

@@ -19,6 +19,7 @@ const Wheel = forwardRef(function Wheel(
       mass: 20,
       type: 'Kinematic',
       collisionFilterGroup: 0,
+      sleepSpeedLimit: 0.03,
       material: {
         friction: 0.1,
       },
