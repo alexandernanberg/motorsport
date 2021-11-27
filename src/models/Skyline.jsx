@@ -9,7 +9,6 @@ Model License:
 * requirements:	Author must be credited. Commercial use is allowed. 
 */
 
-import { useBox, useRaycastVehicle } from '@react-three/cannon'
 import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { createRef, forwardRef, useLayoutEffect, useRef } from 'react'

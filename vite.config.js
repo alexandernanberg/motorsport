@@ -13,7 +13,6 @@ export default defineConfig({
     alias: {
       // Resolve symlink ourselves
       '@react-three/fiber': resolve('node_modules', '@react-three', 'fiber'),
-      // '@react-three/cannon': resolve('../use-cannon'),
       three: resolve('node_modules', 'three'),
       // 'three-stdlib': resolve('../three-stdlib/dist'),
     },

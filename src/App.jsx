@@ -1,48 +1,20 @@
-import { Debug, Physics } from '@react-three/cannon'
 import {
   Environment,
   Loader,
+  OrbitControls,
   PerspectiveCamera,
   Sky as SkyShader,
   Stats,
 } from '@react-three/drei'
 import { Canvas, useFrame } from '@react-three/fiber'
-import * as Ammo from 'ammo.js'
 import { useControls } from 'leva'
 import { forwardRef, Suspense, useLayoutEffect, useRef } from 'react'
 import { Vector3 } from 'three'
 import { InputManager } from './components/InputManager'
+import { Physics } from './components/Physics'
 import { Skyline } from './models/Skyline'
 import { World } from './models/World'
 import { useConstant } from './utils'
-
-console.log(Ammo)
-
-// function Physics() {
-//   const {} = useConstant(() => {
-//     collisionConfiguration = new Ammo.btDefaultCollisionConfiguration()
-//     dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration)
-//     broadphase = new Ammo.btDbvtBroadphase()
-//     solver = new Ammo.btSequentialImpulseConstraintSolver()
-//     physicsWorld = new Ammo.btDiscreteDynamicsWorld(
-//       dispatcher,
-//       broadphase,
-//       solver,
-//       collisionConfiguration
-//     )
-//     physicsWorld.setGravity(new Ammo.btVector3(0, -9.82, 0))
-//   })
-
-//   return null
-// }
-
-function ToggablePysicsDebug({ enabled = false, children }) {
-  if (enabled) {
-    return <Debug color="red">{children}</Debug>
-  }
-
-  return children
-}
 
 function Sky() {
   const sunPosition = [100, 200, 100]
@@ -96,28 +68,20 @@ export function App() {
           <Sky />
           <Environment preset="park" />
           <InputManager ref={inputRef} cameraRef={cameraRef} />
-          <Physics
-            broadphase="SAP"
-            allowSleep
-            gravity={[0, -9.81, 0]}
-            tolerance={1e-7}
-            iterations={10}
-          >
-            <ToggablePysicsDebug enabled={flags.Debug}>
-              <World />
-              <Player
+          <Physics>
+            <World />
+            {/* <Player
                 ref={playerRef}
                 inputRef={inputRef}
                 cameraRef={cameraRef}
-              />
-            </ToggablePysicsDebug>
+              /> */}
           </Physics>
-          {/* <OrbitControls /> */}
-          <ThirdPersonCamera
+          <OrbitControls />
+          {/* <ThirdPersonCamera
             ref={cameraRef}
             targetRef={playerRef}
             inputRef={inputRef}
-          />
+          /> */}
         </Suspense>
       </Canvas>
       <Loader />
