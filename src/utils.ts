@@ -1,13 +1,8 @@
+import type { MutableRefObject, Ref, RefCallback } from 'react'
 import { useMemo, useRef } from 'react'
 
-/**
- * Create constant only once.
- * @template T
- * @param {() => T} fn
- * @return {T}
- */
-export function useConstant(fn) {
-  const ref = useRef()
+export function useConstant<T>(fn: () => T): T {
+  const ref = useRef<{ v: T }>()
 
   if (!ref.current) {
     ref.current = { v: fn() }
@@ -16,7 +11,10 @@ export function useConstant(fn) {
   return ref.current.v
 }
 
-function setRef(ref, value) {
+function setRef<T>(
+  ref: MutableRefObject<T | null> | RefCallback<T> | null | undefined,
+  value: T | null
+): void {
   if (ref == null) return
   if (typeof ref === 'function') {
     ref(value)
@@ -29,7 +27,9 @@ function setRef(ref, value) {
   }
 }
 
-export function useForkRef(...refs) {
+export function useForkRef<T>(
+  ...refs: Array<Ref<T> | null | undefined>
+): RefCallback<T> | null {
   return useMemo(
     () => {
       if (refs.every((ref) => ref == null)) {
