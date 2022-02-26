@@ -3,15 +3,17 @@ import {
   Loader,
   OrbitControls,
   Sky as SkyShader,
-  Stats,
+  useHelper,
 } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { button, useControls } from 'leva'
 import { Perf } from 'r3f-perf'
 import { Suspense, useEffect, useRef, useState } from 'react'
-import { Vector3 } from 'three'
+import type { DirectionalLight } from 'three'
+import { DirectionalLightHelper, Vector3 } from 'three'
 import {
   BallCollider,
+  ConeCollider,
   CuboidCollider,
   CylinderCollider,
   Physics,
@@ -34,10 +36,19 @@ export function Root() {
 
 export function App() {
   const [physicsKey, setPhysicsKey] = useState(1)
-  const flags = useControls({
+
+  const controls = useControls({})
+  const lightsControl = useControls(
+    'Lights',
+    {
+      debug: { label: 'Debug', value: false },
+    },
+    { collapsed: true }
+  )
+  const physicsControls = useControls('Physics', {
     debug: { label: 'Debug', value: false },
     _reset: {
-      label: 'Reset physics',
+      label: 'Reset',
       ...button(() => setPhysicsKey((s) => s + 1)),
     },
   })
@@ -58,18 +69,26 @@ export function App() {
 
   return (
     <>
-      <Perf position="bottom-right" />
-      <Stats />
+      <Perf position="bottom-right" trackCPU />
       <fog attach="fog" args={[0xffffff, 10, 90]} />
       <Sky />
 
       <OrbitControls />
 
-      <Physics debug={flags.debug} key={physicsKey}>
+      <Physics debug={physicsControls.debug} key={physicsKey}>
         <RigidBody type="static">
-          <CuboidCollider args={[20, 0, 20]}>
+          <CuboidCollider args={[30, 0, 30]}>
             <mesh>
-              <boxGeometry args={[20, 0, 20]} />
+              <boxGeometry args={[30, 0, 30]} />
+              <meshStandardMaterial color="white" />
+            </mesh>
+          </CuboidCollider>
+        </RigidBody>
+
+        <RigidBody type="static" position={[5, 3 / 2, 2]}>
+          <CuboidCollider args={[1, 3, 6]}>
+            <mesh>
+              <boxGeometry args={[1, 3, 6]} />
               <meshStandardMaterial color="white" />
             </mesh>
           </CuboidCollider>
@@ -86,8 +105,13 @@ export function App() {
           </RigidBody>
         ))}
 
-        <RigidBody position={[0.5, 1, 0]}>
-          <BallCollider args={[0.5]}>
+        <RigidBody position={[2, 4, 0]}>
+          <BallCollider
+            args={[0.5]}
+            restitution={1}
+            friction={0.9}
+            density={12}
+          >
             <mesh>
               <sphereGeometry args={[0.5]} />
               <meshStandardMaterial color="red" />
@@ -95,7 +119,16 @@ export function App() {
           </BallCollider>
         </RigidBody>
 
-        <RigidBody position={[1, 4, 0]}>
+        <RigidBody position={[2, 5, 0]}>
+          <ConeCollider args={[0.5, 1]}>
+            <mesh>
+              <coneGeometry args={[0.5, 1]} />
+              <meshStandardMaterial color="red" />
+            </mesh>
+          </ConeCollider>
+        </RigidBody>
+
+        <RigidBody position={[0, 2, 0]}>
           <CylinderCollider args={[0.5, 1]}>
             <mesh>
               <cylinderGeometry args={[0.5, 0.5, 1]} />
@@ -104,7 +137,7 @@ export function App() {
           </CylinderCollider>
         </RigidBody>
 
-        <RigidBody position={[0, 5, 0]}>
+        <RigidBody position={[0.5, 5, 0]}>
           <CuboidCollider args={[1, 1, 1]}>
             <mesh>
               <boxGeometry args={[1, 1, 1]} />
@@ -120,6 +153,10 @@ export function App() {
 function Sky() {
   const sunPosition = useConstant(() => new Vector3(100, 200, 100))
 
+  const dirLightRef = useRef<DirectionalLight>()
+
+  useHelper(dirLightRef, DirectionalLightHelper, 1, 'red')
+
   return (
     <>
       <SkyShader
@@ -134,6 +171,7 @@ function Sky() {
         groundColor={0xcbc1b2}
       />
       <directionalLight
+        ref={dirLightRef}
         position={sunPosition}
         castShadow
         shadow-mapSize={[1024, 1024]}

@@ -82,7 +82,7 @@ type RigidBodyType = 'dynamic' | 'static'
 
 interface RigidBodyProps {
   children: ReactNode
-  position?: [number, number, number]
+  position?: [x: number, y: number, z: number]
   type?: RigidBodyType
 }
 
@@ -144,24 +144,58 @@ export function RigidBody({
 ///////////////////////////////////////////////////////////////
 
 interface ColliderProps {
-  position?: [number, number, number]
+  position?: [x: number, y: number, z: number]
+  rotation?: [x: number, y: number, z: number, w: number]
+  friction?: number
+  restitution?: number
+  density?: number
   children: ReactNode
 }
 
-export function useCollider(
-  cb: () => RAPIER.ColliderDesc,
+type UseColliderReturn<T extends () => void> =
+  ReturnType<T> extends RAPIER.ColliderDesc
+    ? RAPIER.Collider
+    : ReturnType<T> extends RAPIER.ColliderDesc | null
+    ? RAPIER.Collider | null
+    : never
+
+export function useCollider<T extends () => RAPIER.ColliderDesc | null>(
+  cb: T,
   props: Omit<ColliderProps, 'children'>
-) {
+): UseColliderReturn<T> {
+  const { position, rotation, friction, restitution, density } = props
   const rigidBody = useContext(RigidBodyContext)
   const { world } = usePhysicsContext()
 
-  return useConstant(() => {
-    const { position } = props
+  const collider = useConstant(() => {
     const colliderDesc = cb()
+
+    if (colliderDesc === null) {
+      return null
+    }
 
     if (position) {
       colliderDesc.setTranslation(...position)
     }
+
+    if (rotation) {
+      const [x, y, z, w] = rotation
+      colliderDesc.setRotation({ x, y, z, w })
+    }
+
+    if (friction) {
+      colliderDesc.setFriction(friction)
+    }
+
+    if (restitution) {
+      colliderDesc.setRestitution(restitution)
+    }
+
+    if (density) {
+      colliderDesc.setDensity(density)
+    }
+
+    // TODO: add mass etc
 
     if (rigidBody) {
       return world.createCollider(colliderDesc, rigidBody.handle)
@@ -169,7 +203,13 @@ export function useCollider(
 
     return world.createCollider(colliderDesc)
   })
+
+  return collider as unknown as UseColliderReturn<T>
 }
+
+///////////////////////////////////////////////////////////////
+// CuboidCollier
+///////////////////////////////////////////////////////////////
 
 interface CuboidColliderProps extends ColliderProps {
   args: [width: number, height: number, depth: number]
@@ -180,10 +220,11 @@ export function CuboidCollider({
   args,
   ...props
 }: CuboidColliderProps) {
+  const [width, height, depth] = args
   const { debug } = usePhysicsContext()
 
   useCollider(
-    () => RAPIER.ColliderDesc.cuboid(args[0] / 2, args[1] / 2, args[2] / 2),
+    () => RAPIER.ColliderDesc.cuboid(width / 2, height / 2, depth / 2),
     props
   )
 
@@ -200,14 +241,21 @@ export function CuboidCollider({
   )
 }
 
+export const BoxCollider = CuboidCollider
+
+///////////////////////////////////////////////////////////////
+// BallCollider
+///////////////////////////////////////////////////////////////
+
 interface BallColliderProps extends ColliderProps {
   args: [radius: number]
 }
 
 export function BallCollider({ children, args, ...props }: BallColliderProps) {
+  const [radius] = args
   const { debug } = usePhysicsContext()
 
-  useCollider(() => RAPIER.ColliderDesc.ball(args[0]), props)
+  useCollider(() => RAPIER.ColliderDesc.ball(radius), props)
 
   return (
     <object3D>
@@ -222,6 +270,12 @@ export function BallCollider({ children, args, ...props }: BallColliderProps) {
   )
 }
 
+export const SphereCollider = BallCollider
+
+///////////////////////////////////////////////////////////////
+// CylinderCollider
+///////////////////////////////////////////////////////////////
+
 interface CylinderColliderProps extends ColliderProps {
   args: [radius: number, height: number]
 }
@@ -231,8 +285,8 @@ export function CylinderCollider({
   args,
   ...props
 }: CylinderColliderProps) {
-  const { debug } = usePhysicsContext()
   const [radius, height] = args
+  const { debug } = usePhysicsContext()
 
   useCollider(() => RAPIER.ColliderDesc.cylinder(height / 2, radius), props)
 
@@ -241,6 +295,102 @@ export function CylinderCollider({
       {debug && (
         <mesh>
           <cylinderGeometry args={[radius, radius, height, 32]} />
+          <meshBasicMaterial wireframe color={0x00ff00} />
+        </mesh>
+      )}
+      {children}
+    </object3D>
+  )
+}
+
+///////////////////////////////////////////////////////////////
+// CapsuleCollider
+///////////////////////////////////////////////////////////////
+
+interface CapsuleColliderProps extends ColliderProps {
+  args: [radius: number, height: number]
+}
+
+export function CapsuleCollider({
+  children,
+  args,
+  ...props
+}: CapsuleColliderProps) {
+  const [radius, height] = args
+  const { debug } = usePhysicsContext()
+
+  useCollider(() => RAPIER.ColliderDesc.capsule(radius, height / 2), props)
+
+  return (
+    <object3D>
+      {debug && (
+        // TODO: use <capsuleGeometry> once it's released
+        <mesh>
+          <boxGeometry args={[radius * 2, height]} />
+          <meshBasicMaterial wireframe color={0x00ff00} />
+        </mesh>
+      )}
+      {children}
+    </object3D>
+  )
+}
+
+///////////////////////////////////////////////////////////////
+// ConeCollider
+///////////////////////////////////////////////////////////////
+
+interface ConeColliderProps extends ColliderProps {
+  args: [radius: number, height: number]
+}
+
+export function ConeCollider({ children, args, ...props }: ConeColliderProps) {
+  const [radius, height] = args
+  const { debug } = usePhysicsContext()
+
+  useCollider(() => RAPIER.ColliderDesc.cone(height / 2, radius), props)
+
+  return (
+    <object3D>
+      {debug && (
+        <mesh>
+          <coneGeometry args={[radius, height, 32]} />
+          <meshBasicMaterial wireframe color={0x00ff00} />
+        </mesh>
+      )}
+      {children}
+    </object3D>
+  )
+}
+
+///////////////////////////////////////////////////////////////
+// ConvexHullCollider
+///////////////////////////////////////////////////////////////
+
+interface ConvexHullColliderProps extends ColliderProps {
+  args: Float32Array
+}
+
+export function ConvexHullCollider({
+  children,
+  args,
+  ...props
+}: ConvexHullColliderProps) {
+  const { debug } = usePhysicsContext()
+
+  const collider = useCollider(
+    () => RAPIER.ColliderDesc.convexHull(args),
+    props
+  )
+
+  // TODO: fix debug shape
+
+  console.log(collider)
+
+  return (
+    <object3D>
+      {debug && (
+        <mesh>
+          {/* <bufferGeometry args={[radius, radius, height, 32]} /> */}
           <meshBasicMaterial wireframe color={0x00ff00} />
         </mesh>
       )}
